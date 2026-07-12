@@ -6,9 +6,12 @@ const NAV = [
   { key: "dashboard", label: "לוח בקרה", icon: "▦" },
   { key: "transactions", label: "עסקאות", icon: "≣" },
   { key: "upload", label: "ייבוא דפי חיוב", icon: "⇪" },
+  { key: "settings", label: "תקציב והגדרות", icon: "⚙" },
 ];
 
-export default function Layout({ active, onNavigate, onImportClick, children }) {
+const CARD_DOT = ["#8B5CF6", "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#06B6D4"];
+
+export default function Layout({ active, onNavigate, onImportClick, cardTotals = [], month, months = [], onMonthChange, children }) {
   return (
     <div
       dir="rtl"
@@ -47,6 +50,28 @@ export default function Layout({ active, onNavigate, onImportClick, children }) 
           })}
         </nav>
 
+        {/* חשבונות — כמו במוקאפ */}
+        {cardTotals.length > 0 && (
+          <div className="px-4 mt-6">
+            <div style={{ fontSize: 11, color: "#6B7280", fontWeight: 800, letterSpacing: "0.08em", marginBottom: 8 }}>
+              כרטיסים
+            </div>
+            <div className="space-y-1">
+              {cardTotals.map(([card, amt], i) => (
+                <div key={card} className="flex items-center justify-between px-2 py-1.5" style={{ borderRadius: 8 }}>
+                  <span className="flex items-center gap-2" style={{ fontSize: 12, color: "#D1D5DB" }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 3, background: CARD_DOT[i % CARD_DOT.length] }} />
+                    <span dir="ltr">{card}</span>
+                  </span>
+                  <span dir="ltr" style={{ fontSize: 12, color: "#9CA3AF", fontVariantNumeric: "tabular-nums" }}>
+                    ₪{Math.round(amt).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="mt-auto px-5 py-4" style={{ fontSize: 11, color: "#6B7280" }}>
           כאל · מקס · אמקס · לאומי
         </div>
@@ -63,13 +88,22 @@ export default function Layout({ active, onNavigate, onImportClick, children }) 
             </div>
             <div style={{ fontSize: 13, color: T.sub }}>הנה התמונה הפיננסית שלך</div>
           </div>
-          <button onClick={onImportClick}
-            style={{
-              background: T.primary, color: "#fff", border: "none", borderRadius: 10,
-              padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
-            }}>
-            + ייבוא דף חיוב
-          </button>
+          <div className="flex items-center gap-2">
+            {onMonthChange && (
+              <select value={month} onChange={e => onMonthChange(e.target.value)}
+                style={{ border: `1px solid ${T.line}`, borderRadius: 10, padding: "9px 12px", background: "#fff", fontSize: 13, fontWeight: 700 }}>
+                <option value="all">כל החודשים</option>
+                {months.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            )}
+            <button onClick={onImportClick}
+              style={{
+                background: T.primary, color: "#fff", border: "none", borderRadius: 10,
+                padding: "10px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer",
+              }}>
+              + ייבוא דף חיוב
+            </button>
+          </div>
         </div>
 
         <div className="p-4 md:p-6">{children}</div>
