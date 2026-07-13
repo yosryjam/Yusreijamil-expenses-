@@ -16,7 +16,7 @@ export async function parseStatementLocally(file) {
     const content = await page.getTextContent();
     const items = content.items
       .filter(item => cleanText(item.str))
-      .map(item => ({ text: cleanText(item.str), x: item.transform[4], y: item.transform[5] }));
+      .map(item => ({ text: cleanText(item.str), x: item.transform[4], y: item.transform[5], width: item.width }));
     allRows.push(...groupRows(items));
     fullText += `\n${items.map(i => i.text).join(" ")}`;
   }

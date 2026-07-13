@@ -46,10 +46,56 @@ export function detectLast4(text) {
   return null;
 }
 
-export function rowToStrings(items) {
-  const asc = [...items].sort((a, b) => a.x - b.x).map(i => i.text);
-  const desc = [...asc].reverse();
-  return [cleanText(asc.join(" ")), cleanText(desc.join(" "))];
+// Some statement PDFs render justified Hebrew text (and even date digits) as
+// one text item per character, with no separator item between words — only a
+// real positional gap between glyph runs. This means two problems have to be
+// solved at once:
+//   1. Whether to insert a space between two items — decided from the actual
+//      gap between the end of one glyph run and the start of the next (using
+//      each item's rendered width), not by always inserting one (which would
+//      turn "19/07/2025" into "1 9 / 0 7 ...").
+//   2. Reading direction is per-run, not per-row: Hebrew words read
+//      right-to-left, but a date or Latin merchant name embedded in the same
+//      row must keep its own left-to-right digit/letter order. Sorting the
+//      whole row by one direction corrupts whichever script isn't in that
+//      direction (a date sorted right-to-left comes out digit-reversed, e.g.
+//      "19/07/2025" -> "5202/70/91").
+// Fix: cluster contiguous glyphs (by gap) in natural left-to-right position
+// order first, then reverse only the clusters whose content is Hebrew, and
+// finally order the clusters themselves right-to-left to match the
+// document's overall RTL column flow.
+const WORD_GAP_THRESHOLD = 1.0;
+const LTR_CLUSTER_RE = /^[0-9A-Za-z.,/:\-₪$€£%'"() ]+$/;
+
+function clusterByGap(itemsAscending) {
+  const clusters = [];
+  let current = null;
+  for (const item of itemsAscending) {
+    const rightEdge = item.x + (item.width || 0);
+    if (current && item.x - current.rightEdge <= WORD_GAP_THRESHOLD) {
+      current.items.push(item);
+      current.rightEdge = Math.max(current.rightEdge, rightEdge);
+    } else {
+      current = { items: [item], rightEdge, minX: item.x };
+      clusters.push(current);
+    }
+  }
+  return clusters;
+}
+
+export function rowToString(items) {
+  const ascending = [...items].sort((a, b) => a.x - b.x);
+  const clusters = clusterByGap(ascending);
+  clusters.sort((a, b) => b.minX - a.minX); // clusters flow right-to-left overall
+
+  const parts = clusters.map(cluster => {
+    const joined = cluster.items.map(i => i.text).join("");
+    const isLtr = LTR_CLUSTER_RE.test(joined);
+    const ordered = isLtr ? cluster.items : [...cluster.items].reverse();
+    return ordered.map(i => i.text).join("");
+  });
+
+  return cleanText(parts.join(" "));
 }
 
 export function groupRows(items) {
@@ -63,7 +109,7 @@ export function groupRows(items) {
     }
     row.items.push(item);
   }
-  return rows.sort((a, b) => b.y - a.y).flatMap(rowToStrings);
+  return rows.sort((a, b) => b.y - a.y).map(row => rowToString(row.items));
 }
 
 export function chooseAmount(line, dateRaw) {

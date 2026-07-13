@@ -3,6 +3,7 @@ import {
   cleanText,
   detectIssuer,
   detectLast4,
+  groupRows,
   parseAmount,
   parseRows,
   toIsoDate,
@@ -59,6 +60,33 @@ describe("detectLast4", () => {
 
   it("returns null when no marker is present", () => {
     expect(detectLast4("no card info")).toBeNull();
+  });
+});
+
+describe("groupRows", () => {
+  it("groups text items sharing a y-coordinate into exactly one row string, top to bottom", () => {
+    const items = [
+      { text: "05/03/2024", x: 10, y: 100 },
+      { text: "שופרסל", x: 50, y: 100 },
+      { text: "123.45", x: 90, y: 100 },
+      { text: "second", x: 10, y: 50 },
+    ];
+    const rows = groupRows(items);
+    // one string per visual row (not two) — the duplicate-ordering bug this
+    // guards against used to make every transaction get parsed and counted twice.
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toContain("05/03/2024");
+    expect(rows[0]).toContain("שופרסל");
+    expect(rows[1]).toContain("second");
+  });
+
+  it("orders items within a row right-to-left (descending x), matching Hebrew reading order", () => {
+    const items = [
+      { text: "A", x: 0, y: 100 },
+      { text: "B", x: 10, y: 101.5 }, // within tolerance of the same row
+    ];
+    const rows = groupRows(items);
+    expect(rows[0]).toBe("B A");
   });
 });
 
