@@ -28,12 +28,13 @@ export default function Settings({ income, budgets, transactions = [], customRul
   async function restoreBackup(file) {
     try {
       const parsed = JSON.parse(await file.text());
-      if (!parsed || !Array.isArray(parsed.transactions)) throw new Error("Invalid backup file");
+      if (!parsed || !Array.isArray(parsed.transactions)) throw new Error("קובץ הגיבוי אינו תקין — חסר מערך עסקאות.");
       onRestore?.(parsed);
       setInc(parsed.income || "");
       setMessage(`שוחזרו ${parsed.transactions.length} עסקאות.`);
     } catch (error) {
-      setMessage(`השחזור נכשל: ${error.message}`);
+      const reason = error instanceof SyntaxError ? "הקובץ אינו JSON תקין." : error.message;
+      setMessage(`השחזור נכשל: ${reason}`);
     }
   }
 
