@@ -27,38 +27,38 @@ export default function Layout({ active, onNavigate, onImportClick, cardTotals =
         fontFamily: "'Heebo','Segoe UI',system-ui,sans-serif",
       }}
     >
-      {/* סיידבר כהה */}
-      <aside className="flex flex-col shrink-0"
-        style={{ width: 230, background: T.sidebar, color: "#fff", minHeight: "100vh" }}>
-        <div className="flex items-center gap-2.5 px-5 py-5">
-          <div className="flex items-center justify-center"
+      {/* סיידבר כהה — מתכווץ לרצועת אייקונים במסכים קטנים */}
+      <aside className="flex flex-col shrink-0 w-16 md:w-[230px] transition-all"
+        style={{ background: T.sidebar, color: "#fff", minHeight: "100vh" }}>
+        <div className="flex items-center justify-center md:justify-start gap-2.5 px-2 md:px-5 py-5">
+          <div className="flex items-center justify-center shrink-0"
             style={{ width: 34, height: 34, borderRadius: 10, background: T.primary, fontWeight: 900 }}>
             ₪
           </div>
-          <div style={{ fontWeight: 800, fontSize: 17 }}>YJ Finance</div>
+          <div className="hidden md:block" style={{ fontWeight: 800, fontSize: 17 }}>YJ Finance</div>
         </div>
 
-        <nav className="flex flex-col gap-1 px-3 mt-1">
+        <nav className="flex flex-col gap-1 px-2 md:px-3 mt-1">
           {NAV.map((item) => {
             const on = active === item.key;
             return (
-              <button key={item.key} onClick={() => onNavigate(item.key)}
-                className="flex items-center gap-3 text-right"
+              <button key={item.key} onClick={() => onNavigate(item.key)} title={item.label}
+                className="flex items-center justify-center md:justify-start gap-3 text-right"
                 style={{
-                  padding: "10px 14px", borderRadius: 10, border: "none", cursor: "pointer",
+                  padding: "10px 8px", borderRadius: 10, border: "none", cursor: "pointer",
                   fontSize: 14, fontWeight: on ? 700 : 500,
                   background: on ? T.sidebarActive : "transparent",
                   color: on ? "#fff" : "#94A3B8",
                   boxShadow: on ? "inset 3px 0 0 " + T.primary : "none",
                 }}>
-                <span>{item.icon}</span>{item.label}
+                <span>{item.icon}</span><span className="hidden md:inline">{item.label}</span>
               </button>
             );
           })}
         </nav>
 
         {cardTotals.length > 0 && (
-          <div className="px-4 mt-6">
+          <div className="hidden md:block px-4 mt-6">
             <div style={{ fontSize: 11, color: "#64748B", fontWeight: 800, letterSpacing: "0.08em", marginBottom: 8 }}>
               כרטיסים
             </div>
@@ -78,7 +78,7 @@ export default function Layout({ active, onNavigate, onImportClick, cardTotals =
           </div>
         )}
 
-        <div className="mt-auto px-5 py-4" style={{ fontSize: 11, color: "#64748B" }}>
+        <div className="hidden md:block mt-auto px-5 py-4" style={{ fontSize: 11, color: "#64748B" }}>
           כאל · מקס · אמקס · לאומי
         </div>
       </aside>
