@@ -13,6 +13,15 @@ import { computeDashboard } from "../utils/dashboardStats";
 import KpiCard from "./dashboard/KpiCard";
 import CategoryDonut from "./dashboard/CategoryDonut";
 
+function SortableHeader({ label, sortKey, sortBy, onSort }) {
+  const active = sortBy.key === sortKey;
+  return (
+    <th onClick={() => onSort(sortKey)} style={{ cursor: "pointer", userSelect: "none", color: active ? T.primary : T.sub }}>
+      {label}{active && (sortBy.dir === "desc" ? " ↓" : " ↑")}
+    </th>
+  );
+}
+
 function Card({ title, action, children }) {
   return (
     <div className="p-4 md:p-5" style={{ background: T.card, border: `1px solid ${T.line}`, borderRadius: 16 }}>
@@ -29,6 +38,24 @@ function Card({ title, action, children }) {
 
 export default function Dashboard({ transactions = [], period, income = 0, budgets = {}, onGoSettings, onCategorySelect }) {
   const [trendCategory, setTrendCategory] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [sortBy, setSortBy] = useState({ key: "amount", dir: "desc" });
+  const [dismissedInsights, setDismissedInsights] = useState(() => new Set());
+
+  function handleCategoryClick(cat) {
+    if (selectedCategory === cat) {
+      setSelectedCategory(null);
+    } else {
+      setSelectedCategory(cat);
+      onCategorySelect?.(cat);
+    }
+  }
+
+  function toggleSort(key) {
+    setSortBy(current => current.key === key
+      ? { key, dir: current.dir === "desc" ? "asc" : "desc" }
+      : { key, dir: "desc" });
+  }
 
   const { data, error } = useMemo(() => {
     try {
@@ -69,6 +96,22 @@ export default function Dashboard({ transactions = [], period, income = 0, budge
 
   const d = data;
 
+  const sortedCategoryTable = [...d.categoryTable].sort((a, b) => {
+    const dir = sortBy.dir === "asc" ? 1 : -1;
+    const av = a[sortBy.key], bv = b[sortBy.key];
+    return ((av ?? -Infinity) - (bv ?? -Infinity)) * dir;
+  });
+
+  if (d.count === 0) {
+    return (
+      <Card title="אין נתונים לתקופה שנבחרה">
+        <div style={{ color: T.sub, fontSize: 13 }}>
+          לא נמצאו עסקאות בתקופה שבחרתם. נסו לבחור תקופה אחרת בבורר שלמעלה.
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* ===== KPI row ===== */}
@@ -81,10 +124,17 @@ export default function Dashboard({ transactions = [], period, income = 0, budge
           spark={d.spark} color={T.orange} soft={T.orangeSoft} icon="🧾" />
         <KpiCard label="קטגוריה מובילה" value={d.topCategory}
           color={T.green} soft={T.greenSoft} icon="🏷" />
-        <KpiCard label="שינוי לעומת קודם" value={d.deltaPct != null ? `${d.deltaPct > 0 ? "+" : ""}${d.deltaPct.toFixed(0)}%` : "—"}
+        <KpiCard label="שינוי לעומת קודם"
+          value={d.deltaPct != null ? `${d.deltaPct > 0 ? "+" : ""}${d.deltaPct.toFixed(0)}%` : "אין מספיק נתונים להשוואה"}
           deltaPct={d.deltaPct} color={d.deltaPct > 0 ? T.red : T.green}
           soft={d.deltaPct > 0 ? T.redSoft : T.greenSoft} icon="↕" />
       </div>
+
+      {d.isPartialMonth && (
+        <div style={{ fontSize: 12, color: T.sub, background: T.blueSoft, borderRadius: 10, padding: "6px 12px", display: "inline-block" }}>
+          החודש הנוכחי טרם הסתיים — הנתונים חלקיים.
+        </div>
+      )}
 
       {income === 0 && (
         <div className="p-3 flex items-center justify-between flex-wrap gap-2"
@@ -99,8 +149,14 @@ export default function Dashboard({ transactions = [], period, income = 0, budge
 
       {/* ===== category donut · trend · spending by card ===== */}
       <div className="grid lg:grid-cols-3 gap-4">
-        <Card title="פילוח לפי קטגוריה">
-          <CategoryDonut data={d.donut} total={d.total} onSelectCategory={onCategorySelect} />
+        <Card title="פילוח לפי קטגוריה"
+          action={selectedCategory && (
+            <button onClick={() => setSelectedCategory(null)}
+              style={{ background: "none", border: "none", color: T.primary, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+              נקה סינון ×
+            </button>
+          )}>
+          <CategoryDonut data={d.donut} total={d.total} selectedCategory={selectedCategory} onSelectCategory={handleCategoryClick} />
         </Card>
 
         <Card title="מגמת הוצאות"
@@ -151,12 +207,23 @@ export default function Dashboard({ transactions = [], period, income = 0, budge
       {/* ===== insights · recent transactions ===== */}
       <div className="grid lg:grid-cols-2 gap-4">
         <Card title="תובנות פיננסיות">
-          <div className="space-y-2">
-            {insights.map((s, i) => (
-              <div key={i} className="flex gap-2" style={{ fontSize: 13 }}>
-                <span style={{ color: T.primary }}>•</span><span>{s}</span>
-              </div>
-            ))}
+          <div className="space-y-2.5">
+            {insights.filter(x => !dismissedInsights.has(x.id)).map(x => {
+              const color = x.severity === "critical" ? T.red : x.severity === "warning" ? T.orange : T.primary;
+              return (
+                <div key={x.id} className="flex gap-2 items-start" style={{ fontSize: 13, borderRight: `3px solid ${color}`, paddingRight: 8 }}>
+                  <div className="flex-1">
+                    <div style={{ fontWeight: 700 }}>{x.message}</div>
+                    {x.explanation && <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>{x.explanation}</div>}
+                    {x.suggestedAction && <div style={{ fontSize: 11, color, marginTop: 2, fontWeight: 600 }}>💡 {x.suggestedAction}</div>}
+                  </div>
+                  <button onClick={() => setDismissedInsights(prev => new Set(prev).add(x.id))} title="התעלמות"
+                    style={{ background: "none", border: "none", color: T.sub, cursor: "pointer", fontSize: 13, flexShrink: 0 }}>
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </Card>
 
@@ -191,17 +258,32 @@ export default function Dashboard({ transactions = [], period, income = 0, budge
 
       {/* ===== category summary table · top merchants ===== */}
       <div className="grid lg:grid-cols-2 gap-4">
-        <Card title="סיכום לפי קטגוריה">
+        <Card title="סיכום לפי קטגוריה"
+          action={selectedCategory && (
+            <button onClick={() => setSelectedCategory(null)}
+              style={{ background: "none", border: "none", color: T.primary, fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+              נקה סינון ×
+            </button>
+          )}>
           <div style={{ overflowX: "auto" }}>
             <table className="w-full" style={{ fontSize: 12.5 }}>
               <thead>
                 <tr style={{ color: T.sub, textAlign: "right" }}>
-                  <th className="py-1.5">קטגוריה</th><th>סכום</th><th>%</th><th>ממוצע חודשי</th><th>עסקאות</th><th>שינוי</th>
+                  <th className="py-1.5">קטגוריה</th>
+                  <SortableHeader label="סכום" sortKey="amount" sortBy={sortBy} onSort={toggleSort} />
+                  <SortableHeader label="%" sortKey="pct" sortBy={sortBy} onSort={toggleSort} />
+                  <th>ממוצע חודשי</th>
+                  <SortableHeader label="עסקאות" sortKey="count" sortBy={sortBy} onSort={toggleSort} />
+                  <th>שינוי</th>
                 </tr>
               </thead>
               <tbody>
-                {d.categoryTable.map(r => (
-                  <tr key={r.cat} style={{ borderTop: `1px solid ${T.line}` }}>
+                {sortedCategoryTable.map(r => (
+                  <tr key={r.cat} onClick={() => handleCategoryClick(r.cat)}
+                    style={{
+                      borderTop: `1px solid ${T.line}`, cursor: "pointer",
+                      background: selectedCategory === r.cat ? T.primarySoft : "transparent",
+                    }}>
                     <td className="py-1.5" style={{ fontWeight: 600 }}>{r.cat}</td>
                     <td style={{ direction: "ltr", textAlign: "right" }}>{fmt(r.amount)}</td>
                     <td>{r.pct.toFixed(0)}%</td>
@@ -226,7 +308,7 @@ export default function Dashboard({ transactions = [], period, income = 0, budge
                   <div className="flex justify-between" style={{ fontSize: 13 }}>
                     <span dir="auto" style={{ fontWeight: 600 }}>{i + 1}. {m.merchant}</span>
                     <span style={{ fontVariantNumeric: "tabular-nums", color: T.sub, direction: "ltr" }}>
-                      {fmt(m.amount)} · {m.count} עסקאות
+                      {fmt(m.amount)} · {m.pct.toFixed(0)}% · {m.count} עסקאות
                     </span>
                   </div>
                   <div style={{ background: T.line, borderRadius: 6, height: 6, marginTop: 3 }}>

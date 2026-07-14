@@ -5,17 +5,31 @@ import { filterByPeriod, periodToMonths, previousPeriodMonths } from "./period";
 
 const FEES_CATEGORY = "ריבית ועמלות";
 
+// Groups "obvious variants" of a merchant name for aggregation (case,
+// punctuation and whitespace differences only) without altering the original
+// transaction's merchant text — the first-seen raw spelling is kept for display.
+function normalizeMerchantKey(name) {
+  return (name || "").toLowerCase().replace(/["'.,\-()]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function daysInMonth(month) {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(y, m, 0).getDate();
+}
+
 export function computeDashboard(transactions, period, trendCategory = "all") {
   const inPeriod = filterByPeriod(transactions, period);
   const total = inPeriod.reduce((s, t) => s + t.amount, 0);
 
-  const byCat = {}, byCard = {}, byMerchant = {}, byMerchantCount = {};
+  const byCat = {}, byCard = {}, byMerchant = {}, byMerchantCount = {}, byMerchantDisplay = {};
   for (const t of inPeriod) {
     byCat[t.category] = (byCat[t.category] || 0) + t.amount;
     byCard[t.card] = (byCard[t.card] || 0) + t.amount;
     if (t.amount > 0 && t.category !== FEES_CATEGORY) {
-      byMerchant[t.merchant] = (byMerchant[t.merchant] || 0) + t.amount;
-      byMerchantCount[t.merchant] = (byMerchantCount[t.merchant] || 0) + 1;
+      const key = normalizeMerchantKey(t.merchant);
+      byMerchant[key] = (byMerchant[key] || 0) + t.amount;
+      byMerchantCount[key] = (byMerchantCount[key] || 0) + 1;
+      if (!byMerchantDisplay[key]) byMerchantDisplay[key] = t.merchant;
     }
   }
 
@@ -61,14 +75,23 @@ export function computeDashboard(transactions, period, trendCategory = "all") {
 
   const topMerchants = Object.entries(byMerchant)
     .sort((a, b) => b[1] - a[1]).slice(0, 10)
-    .map(([merchant, amount]) => ({ merchant, amount, count: byMerchantCount[merchant] }));
+    .map(([key, amount]) => ({
+      merchant: byMerchantDisplay[key], amount, count: byMerchantCount[key],
+      pct: total ? (amount / total) * 100 : 0,
+    }));
 
   const recent = [...inPeriod].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 8);
   const cardBars = Object.entries(byCard).sort((a, b) => b[1] - a[1]);
   const count = inPeriod.length;
 
+  // The current, still-in-progress calendar month gets a "partial month" flag
+  // so the dashboard can label it instead of implying a full month of data.
+  const isPartialMonth = period.mode === "current" && !!period.anchorMonth &&
+    monthOf(new Date().toISOString()) === period.anchorMonth &&
+    new Date().getDate() < daysInMonth(period.anchorMonth);
+
   return {
-    total, deltaPct, monthlyAverage, topCategory, count,
+    total, deltaPct, monthlyAverage, topCategory, count, isPartialMonth,
     trend, spark, donut, categoryTable, topMerchants, recent, cardBars,
   };
 }

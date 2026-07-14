@@ -9,7 +9,7 @@ import Budgets from "./components/Budgets";
 import Reports from "./components/Reports";
 import Insights from "./components/Insights";
 import Settings from "./components/Settings";
-import { store, monthOf } from "./constants/theme";
+import { store, monthOf, migrateCategory } from "./constants/theme";
 import { defaultPeriod } from "./utils/period";
 
 const TX_KEY = "yjf-transactions";
@@ -17,12 +17,23 @@ const RULES_KEY = "yjf-rules";
 const INCOME_KEY = "yjf-income";
 const BUDGETS_KEY = "yjf-budgets";
 
+// Phase 3 renamed a couple of category strings — remap anything already saved
+// under the old names so existing transactions/budgets keep matching correctly.
+function migrateTransactions(txs) {
+  return txs.map(t => (t.category ? { ...t, category: migrateCategory(t.category) } : t));
+}
+function migrateBudgets(buds) {
+  const out = {};
+  for (const [cat, value] of Object.entries(buds || {})) out[migrateCategory(cat)] = value;
+  return out;
+}
+
 export default function App() {
   const [view, setView] = useState("dashboard");
-  const [transactions, setTransactions] = useState(() => store.load(TX_KEY, []));
+  const [transactions, setTransactions] = useState(() => migrateTransactions(store.load(TX_KEY, [])));
   const [customRules, setCustomRules] = useState(() => store.load(RULES_KEY, []));
   const [income, setIncome] = useState(() => store.load(INCOME_KEY, 0));
-  const [budgets, setBudgets] = useState(() => store.load(BUDGETS_KEY, {}));
+  const [budgets, setBudgets] = useState(() => migrateBudgets(store.load(BUDGETS_KEY, {})));
   const [period, setPeriod] = useState(() => defaultPeriod(store.load(TX_KEY, [])));
   const [pendingCategoryFilter, setPendingCategoryFilter] = useState(null);
 
@@ -57,6 +68,10 @@ export default function App() {
   const handleCategoryChange = useCallback((id, category, merchant) => {
     setTransactions(prev => prev.map(t => (t.id === id ? { ...t, category } : t)));
     if (merchant) setCustomRules(prev => [[merchant, category], ...prev.filter(([p]) => p !== merchant)]);
+  }, []);
+
+  const handleUpdateTransaction = useCallback((id, patch) => {
+    setTransactions(prev => prev.map(t => (t.id === id ? { ...t, ...patch } : t)));
   }, []);
 
   const handleDelete = useCallback((id) => {
@@ -103,7 +118,7 @@ export default function App() {
       )}
       {view === "transactions" && (
         <Transactions transactions={transactions} months={months} initialCategory={pendingCategoryFilter}
-          onCategoryChange={handleCategoryChange} onDelete={handleDelete} />
+          onCategoryChange={handleCategoryChange} onUpdateTransaction={handleUpdateTransaction} onDelete={handleDelete} />
       )}
       {view === "budgets" && (
         <Budgets budgets={budgets} transactions={transactions} period={period} onSave={handleSaveBudgets} />
@@ -123,10 +138,10 @@ export default function App() {
           customRules={customRules}
           onSave={handleSaveSettings}
           onRestore={({ transactions: restoredTransactions, customRules: restoredRules, income: restoredIncome, budgets: restoredBudgets }) => {
-            setTransactions(Array.isArray(restoredTransactions) ? restoredTransactions : []);
+            setTransactions(migrateTransactions(Array.isArray(restoredTransactions) ? restoredTransactions : []));
             setCustomRules(Array.isArray(restoredRules) ? restoredRules : []);
             setIncome(Number(restoredIncome) || 0);
-            setBudgets(restoredBudgets && typeof restoredBudgets === "object" ? restoredBudgets : {});
+            setBudgets(migrateBudgets(restoredBudgets && typeof restoredBudgets === "object" ? restoredBudgets : {}));
           }}
         />
       )}

@@ -44,7 +44,17 @@ describe("computeDashboard", () => {
 
   it("excludes the fees category from top merchants", () => {
     const d = computeDashboard(TX, period, "all");
-    expect(d.topMerchants).toEqual([{ merchant: "שופרסל", amount: 200, count: 1 }]);
+    expect(d.topMerchants).toEqual([{ merchant: "שופרסל", amount: 200, count: 1, pct: (200 / 230) * 100 }]);
+  });
+
+  it("groups obvious merchant-name variants (case/whitespace) without losing the original spelling", () => {
+    const variants = [
+      { date: "2024-02-01", amount: 50, category: "מסעדות ובתי קפה", card: "CAL-1", merchant: "WOLT ISRAEL" },
+      { date: "2024-02-05", amount: 30, category: "מסעדות ובתי קפה", card: "CAL-1", merchant: "wolt israel" },
+      { date: "2024-02-10", amount: 20, category: "מסעדות ובתי קפה", card: "CAL-1", merchant: "Wolt Israel " },
+    ];
+    const d = computeDashboard(variants, { mode: "current", anchorMonth: "2024-02" }, "all");
+    expect(d.topMerchants).toEqual([{ merchant: "WOLT ISRAEL", amount: 100, count: 3, pct: 100 }]);
   });
 
   it("groups spend by card within the period", () => {
