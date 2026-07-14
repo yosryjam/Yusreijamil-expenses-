@@ -26,3 +26,9 @@ dist-ssr
 # Env / Netlify
 .env
 .netlify
+
+# Real statement PDFs used for local parser development — never commit these,
+# they contain personal financial information. Fixtures use redacted/synthetic
+# text only (src/services/pdf/parsers/__fixtures__).
+*.pdf
+/pdf-samples/

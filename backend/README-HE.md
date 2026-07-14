@@ -1,4 +1,8 @@
-# YJ Finance — Backend (FastAPI)
+# YJ Finance — Backend (FastAPI) — מיושן, לא בשימוש ב-Version 2
+
+> **שים לב:** קוד זה מיושן ואינו בשימוש. החל מ-Version 2, פענוח דפי החיוב מתבצע
+> מקומית בדפדפן (`pdfjs-dist`), ללא שרת וללא מפתח Claude API. אין צורך להגדיר
+> `ANTHROPIC_API_KEY` או להריץ שרת זה כדי להשתמש באפליקציה.
 
 ## התקנה חד-פעמית
 ```

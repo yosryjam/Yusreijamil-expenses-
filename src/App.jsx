@@ -1,25 +1,41 @@
-// src/App.jsx — שורש: מצב משותף, localStorage, הכנסה+תקציבים, למידת חוקים
+// src/App.jsx — שורש: מצב משותף, localStorage, הכנסה+תקציבים, למידת חוקים, תקופה משותפת
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Layout from "./components/Layout";
 import Dashboard from "./components/Dashboard";
 import Uploader from "./components/Uploader";
 import Transactions from "./components/Transactions";
+import Budgets from "./components/Budgets";
+import Reports from "./components/Reports";
+import Insights from "./components/Insights";
 import Settings from "./components/Settings";
-import { store, monthOf } from "./constants/theme";
+import { store, monthOf, migrateCategory } from "./constants/theme";
+import { defaultPeriod } from "./utils/period";
 
 const TX_KEY = "yjf-transactions";
 const RULES_KEY = "yjf-rules";
 const INCOME_KEY = "yjf-income";
 const BUDGETS_KEY = "yjf-budgets";
 
+// Phase 3 renamed a couple of category strings — remap anything already saved
+// under the old names so existing transactions/budgets keep matching correctly.
+function migrateTransactions(txs) {
+  return txs.map(t => (t.category ? { ...t, category: migrateCategory(t.category) } : t));
+}
+function migrateBudgets(buds) {
+  const out = {};
+  for (const [cat, value] of Object.entries(buds || {})) out[migrateCategory(cat)] = value;
+  return out;
+}
+
 export default function App() {
   const [view, setView] = useState("dashboard");
-  const [transactions, setTransactions] = useState(() => store.load(TX_KEY, []));
+  const [transactions, setTransactions] = useState(() => migrateTransactions(store.load(TX_KEY, [])));
   const [customRules, setCustomRules] = useState(() => store.load(RULES_KEY, []));
   const [income, setIncome] = useState(() => store.load(INCOME_KEY, 0));
-  const [budgets, setBudgets] = useState(() => store.load(BUDGETS_KEY, {}));
-  const [month, setMonth] = useState("all");
+  const [budgets, setBudgets] = useState(() => migrateBudgets(store.load(BUDGETS_KEY, {})));
+  const [period, setPeriod] = useState(() => defaultPeriod(store.load(TX_KEY, [])));
+  const [pendingCategoryFilter, setPendingCategoryFilter] = useState(null);
 
   useEffect(() => { store.save(TX_KEY, transactions); }, [transactions]);
   useEffect(() => { store.save(RULES_KEY, customRules); }, [customRules]);
@@ -31,9 +47,11 @@ export default function App() {
     [transactions]
   );
 
-  // ברירת מחדל: החודש האחרון שיובא (כדי שהטבעת והתקציב יהיו חודשיים)
+  // ברירת מחדל: החודש האחרון שיובא, פעם ראשונה בלבד שיש נתונים
   useEffect(() => {
-    if (month === "all" && months.length) setMonth(months[0]);
+    if (!period.anchorMonth && months.length) {
+      setPeriod(p => ({ ...p, anchorMonth: months[0] }));
+    }
   }, [months]); // eslint-disable-line
 
   const cardTotals = useMemo(() => {
@@ -52,39 +70,80 @@ export default function App() {
     if (merchant) setCustomRules(prev => [[merchant, category], ...prev.filter(([p]) => p !== merchant)]);
   }, []);
 
+  const handleUpdateTransaction = useCallback((id, patch) => {
+    setTransactions(prev => prev.map(t => (t.id === id ? { ...t, ...patch } : t)));
+  }, []);
+
   const handleDelete = useCallback((id) => {
     setTransactions(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  const handleSaveSettings = useCallback((inc, buds) => {
+  const handleSaveSettings = useCallback((inc) => {
     setIncome(inc);
-    setBudgets(buds);
     setView("dashboard");
+  }, []);
+
+  const handleSaveBudgets = useCallback((buds) => {
+    setBudgets(buds);
+  }, []);
+
+  const handleNavigate = useCallback((next) => {
+    setPendingCategoryFilter(null);
+    setView(next);
+  }, []);
+
+  const handleCategorySelect = useCallback((category) => {
+    setPendingCategoryFilter(category);
+    setView("transactions");
   }, []);
 
   return (
     <Layout
       active={view}
-      onNavigate={setView}
-      onImportClick={() => setView("upload")}
+      onNavigate={handleNavigate}
+      onImportClick={() => handleNavigate("upload")}
       cardTotals={cardTotals}
-      month={month}
-      months={months}
-      onMonthChange={setMonth}
+      period={period}
+      onPeriodChange={setPeriod}
+      transactions={transactions}
     >
       {view === "dashboard" && (
-        <Dashboard transactions={transactions} month={month}
-          income={income} budgets={budgets} onGoSettings={() => setView("settings")} />
+        <Dashboard transactions={transactions} period={period}
+          income={income} budgets={budgets}
+          onGoSettings={() => handleNavigate("settings")}
+          onCategorySelect={handleCategorySelect} />
       )}
       {view === "upload" && (
         <Uploader existingTransactions={transactions} customRules={customRules} onImported={handleImported} />
       )}
       {view === "transactions" && (
-        <Transactions transactions={transactions} months={months}
-          onCategoryChange={handleCategoryChange} onDelete={handleDelete} />
+        <Transactions transactions={transactions} months={months} initialCategory={pendingCategoryFilter}
+          onCategoryChange={handleCategoryChange} onUpdateTransaction={handleUpdateTransaction} onDelete={handleDelete} />
+      )}
+      {view === "budgets" && (
+        <Budgets budgets={budgets} transactions={transactions} period={period} onSave={handleSaveBudgets} />
+      )}
+      {view === "reports" && (
+        <Reports transactions={transactions} />
+      )}
+      {view === "insights" && (
+        <Insights transactions={transactions} period={period} onPeriodChange={setPeriod}
+          budgets={budgets} income={income} />
       )}
       {view === "settings" && (
-        <Settings income={income} budgets={budgets} onSave={handleSaveSettings} />
+        <Settings
+          income={income}
+          budgets={budgets}
+          transactions={transactions}
+          customRules={customRules}
+          onSave={handleSaveSettings}
+          onRestore={({ transactions: restoredTransactions, customRules: restoredRules, income: restoredIncome, budgets: restoredBudgets }) => {
+            setTransactions(migrateTransactions(Array.isArray(restoredTransactions) ? restoredTransactions : []));
+            setCustomRules(Array.isArray(restoredRules) ? restoredRules : []);
+            setIncome(Number(restoredIncome) || 0);
+            setBudgets(migrateBudgets(restoredBudgets && typeof restoredBudgets === "object" ? restoredBudgets : {}));
+          }}
+        />
       )}
     </Layout>
   );

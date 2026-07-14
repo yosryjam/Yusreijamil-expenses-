@@ -164,7 +164,7 @@ Extract ONLY real spending transactions and interest/fee lines. Return ONLY a JS
 
 Rules:
 - amount = the CHARGE amount in ILS (סכום חיוב / סכום לחיוב). Credits/refunds (זיכוי) are NEGATIVE numbers.
-- CARD = issuer + last 4 digits, e.g. "CAL-2461", "CAL-9676", "MAX-7995", "MAX-1119", "AMEX-7067", "LEUMI". Read from the statement header (הכרטיס המסתיים ב-XXXX / כרטיס שמסתיים בספרות).
+- CARD = issuer + last 4 digits, e.g. "CAL-1234", "MAX-5678", "AMEX-9012", "LEUMI". Read from the statement header (הכרטיס המסתיים ב-XXXX / כרטיס שמסתיים בספרות).
 - Keep merchant names in Hebrew exactly as written.
 - INCLUDE: purchases, standing orders (הוראת קבע), installment charges (תשלום X מ-Y, only the charged installment amount), card fees (דמי כרטיס), FX fees, and interest lines (ריבית) — for revolving-credit interest lines use merchant "ריבית אשראי מתגלגל".
 - EXCLUDE entirely: "יתרת עסקות מצטברת" / accumulated balance rollover lines, "שירות אשראי מתגלגל" PRINCIPAL (קרן) lines, "העברה לסל מצטבר", balance summaries, totals rows, future-charge duplicates of transactions already listed as charged.

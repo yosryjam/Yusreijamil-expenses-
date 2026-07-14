@@ -1,16 +1,30 @@
-# React + Vite
+# YJ Finance – Free Local PDF Edition
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A private personal expense dashboard for monthly MAX, CAL, American Express, Mileage Plus and Bank Leumi PDF statements.
 
-Currently, two official plugins are available:
+## Privacy and cost
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- PDF extraction runs in the browser with `pdfjs-dist`.
+- No Claude, OpenAI or paid API is required.
+- PDFs are not uploaded to a third-party AI service.
+- Transactions, budgets and rules are stored in browser `localStorage`.
+- Use **Settings → Download full backup** regularly.
 
-## React Compiler
+## Run locally
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+npm run dev
+```
 
-## Expanding the Oxlint configuration
+## Deploy to Netlify
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+1. Push this project to GitHub.
+2. Connect the repository to Netlify.
+3. Build command: `npm run build`
+4. Publish directory: `dist`
+5. No API keys or environment variables are needed.
+
+## PDF limitations
+
+The free parser works with digital PDFs containing selectable text. Scanned image PDFs require OCR, which is not included in this first release. Always review imported transactions before saving because card issuers can change statement layouts.
